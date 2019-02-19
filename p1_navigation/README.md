@@ -20,6 +20,35 @@ The state space has 37 dimensions and contains the agent's velocity, along with 
 
 The task is episodic, and in order to solve the environment, your agent must get an average score of +13 over 100 consecutive episodes.
 
+### Getting Started
+
+1. Follow the instructions in [this repository](https://github.com/openai/gym) to perform a minimal install of OpenAI gym.  
+	- Next, install the **classic control** environment group by following the instructions [here](https://github.com/openai/gym#classic-control).
+	- Then, install the **box2d** environment group by following the instructions [here](https://github.com/openai/gym#box2d).
+
+2. Download the environment from one of the links below：
+    - Windows (64-bit): [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P1/Banana/Banana_Windows_x86_64.zip)
+    
+    (_For Windows users_) Check out [this link](https://support.microsoft.com/en-us/help/827218/how-to-determine-whether-a-computer-is-running-a-32-bit-version-or-64) if you need help with determining if your computer is running a 32-bit version or 64-bit version of the Windows operating system.
+
+
+3. Place the file in the DRLND GitHub repository, in the `p1_navigation/` folder, and unzip (or decompress) the file. 
+
+4. Pytorch is installed with following command:
+
+- conda install pytorch torchvision cuda100 -c pytorch
+
+5. My basic working environment is as follows:
+
+- Windows 10
+- Python 3.5
+- CUDA 10.0
+
+### Instructions
+
+In order to train the againt,execute the cells in sequences after "4.It's Your Turn!".
+
+
 ### Description
 
 A typical DQN method is used in this project, states of the environments are used as input and actions are traited as outputs. 
