@@ -1,3 +1,3 @@
-# Deep Reinforcement learning Learning blog 5 - Deep Q-learning
+# Deep Reinforcement learning Learning blog 5 - RL in Continous Spaces
 
 ## Intro

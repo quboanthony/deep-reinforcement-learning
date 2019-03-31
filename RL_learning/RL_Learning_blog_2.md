@@ -1,3 +1,3 @@
-# Deep Reinforcement learning Learning blog 2 - Monte Carlo Method
+# Deep Reinforcement learning Learning blog 2 - Markov Decision Process, framework of the reinforcement Learning
 
 ## Intro

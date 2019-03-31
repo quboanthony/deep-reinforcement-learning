@@ -1,3 +1,3 @@
-# Deep Reinforcement learning Learning blog 3 - TD Method
+# Deep Reinforcement learning Learning blog 3 - Dynamic Programming
 
 ## Intro

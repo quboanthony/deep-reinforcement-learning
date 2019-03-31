@@ -22,7 +22,7 @@ Unlike supervised learning, reinforcement learning does not have the structural 
 
 Unlike un-supervised Learning, reinforcement indeed have some response after all, just not the same form as in supervised learning.
 
-The goal of the agent is to learn a **policy** (a series of actions under states) to maximize expected **cumulative reward** or the expected sum of rewards attained over all time steps. Note that we use the word **expected** here because in many cases, the rewards of all future steps cannot be determined, we want to calculate the expected value in statistical term.
+The goal of the agent is to learn a **policy** (a series of actions under states) to **maximize expected cumulative reward** or the expected sum of rewards attained over all time steps. Note that we use the word **expected** here because in many cases, the rewards of all future steps cannot be determined, we want to calculate the expected value in statistical term.
 
 Elements of RL:
 1. agent & enviroment
@@ -40,3 +40,25 @@ Elements of RL:
 - business
 - telcommunications
 - Finance
+
+
+## RL tasks
+- Episodic tasks
+This type of tasks have a well-defined starting point and ending point, and an episode is the process from start to end.
+
+- Continous tasks
+This type of tasks continus forever.
+
+## Element 1: agent and enviroment
+
+The enviorment in an agent's observation at step $t$ is usually noted as $S_t$.
+
+The agent's action at step $t$ is noted as $A_t$
+
+When the agent takes an action $A_t$, its enviroment change from $S_t$ to $S_{t+1}$, and it will recieve a reward note as $R_{t+1}$.
+
+## Element 2: policy
+A policy is how the agent take action under time step $t$. It is often defined as a **conditional probability**, $\pi(a|s)=P(A_t|S_t)$.
+
+## Element 3： reward signal
+The agent recieve a reward at

@@ -1,3 +1,3 @@
-# Deep Reinforcement learning Learning blog 4 - RL in continous state and action space
+# Deep Reinforcement learning Learning blog 4 - Monte Carlo Methodes and Temporal Difference Methods
 
 ## Intro
