@@ -39,21 +39,23 @@ class Agent():
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
 
         # Replay memory
-        self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed)
+        #self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed)
+        self.memory=self.PMemory(BUFFER_SIZE)
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
     
     def step(self, state, action, reward, next_state, done):
         # Save experience in replay memory
-        self.memory.add(state, action, reward, next_state, done)
+        transition=np.hstack((state,action,reward,next_state,done))
+        self.memory.store(transition)
         
         # Learn every UPDATE_EVERY time steps.
         self.t_step = (self.t_step + 1) % UPDATE_EVERY
         if self.t_step == 0:
             # If enough samples are available in memory, get random subset and learn
             if len(self.memory) > BATCH_SIZE:
-                experiences = self.memory.sample()
-                self.learn(experiences, GAMMA)
+                b_idx,experiences,ISWeights = self.memory.sample(BATCH_SIZE)
+                self.learn(b_idx,experiences, ISWeights, GAMMA)
 
     def act(self, state, eps=0.):
         """Returns actions for given state as per current policy.
@@ -75,7 +77,37 @@ class Agent():
         else:
             return random.choice(np.arange(self.action_size))
 
-    def learn(self, experiences, gamma):
+
+    def weighted_mse_loss(self,input,target,weights):
+        '''
+
+        Return the weighted mse loss to be used by Prioritized experience replay
+
+
+
+        :param input: torch.Tensor.
+
+        :param target: torch.Tensor.
+
+        :param weights: torch.Tensor.
+
+        :return loss:  torch.Tensor.
+
+        '''
+
+        # source: http://
+    
+        # forums.fast.ai/t/how-to-make-a-custom-loss-function-pytorch/9059/20
+    
+        out = (input-target)**2
+    
+        out = out * weights.expand_as(out)
+    
+        loss = out.mean(0)  # or sum over whatever dimensions
+    
+        return loss
+    
+    def learn(self, b_idx, experiences, ISWeights, gamma):
         """Update value parameters using given batch of experience tuples.
 
         Params
@@ -88,7 +120,7 @@ class Agent():
         ## TODO: compute and minimize the loss
         "*** YOUR CODE HERE ***"
         #Double dqn: the action is determined by q-learning rule with online qnetwork, and the Q value of this action is obtained by target qnetwork
-        arg_maxs=self.qnetwork_local(next_states).detach().max(1)[1].unsqueeze(1)# for torch object, .max()[1] returns the argmax, .max[0] returns the max value
+        arg_maxs=self.qnetwork_local(next_states).detach().max(1)[1].unsqueeze(1)# for torch object, .max()[1] returns the argmax, .max()[0] returns the max value
         
         Q_targets_next=self.qnetwork_target(next_states).gather(1,arg_maxs)
         
@@ -96,7 +128,13 @@ class Agent():
         
         Q_expected=self.qnetwork_local(states).gather(1,actions)
         
-        loss=F.mse_loss(Q_expected,Q_targets)
+        td_errors=Q_expected-Q_targets
+        
+        self.memory.batch_update(b_idx, td_errors)
+        
+        Weights=torch.tensor(ISWeights,device=device,dtype=torch.float).reshape(-1, 1)
+        
+        loss = self.weighted_mse_loss(Q_expected,Q_targets,Weights)
         
         self.optimizer.zero_grad()
         loss.backward()
@@ -215,7 +253,7 @@ class SumTree():
         return self.tree[0]
     
 
-class Memory():
+class PMemory():
     """
 
     This Memory class is modified based on the original code from:
@@ -244,5 +282,35 @@ class Memory():
         pri_seg=self.tree.total_p/n
         self.beta=np.min([1.,self.beta+self.beta_increment_per_sampling])
         
-        min_prob
+        min_prob=np.min(self.tree.tree[-self.tree.capacity:])/self.tree.total_p
+        if min_prob==0:
+            min_prob=0.00001
+            
+        for i in range(n):
+            a,b=pri_seg*i,pri_seg*(i+1)
+            v=np.random.uniform(a,b)
+            idx,p,data=self.tree.get_leaf(v)
+            prob=p/self.tree.total_p
+            ISWeights[i,0]=np.power(prob/min_prob,-self.beta)
+            b_idx[i]=idx
+            b_memory[i,:]=data
+            
+        states = torch.from_numpy(np.vstack([d[0] for d in b_memory if d is not None])).float().to(device)
+        actions = torch.from_numpy(np.vstack([d[1] for d in b_memory if d is not None])).long().to(device)
+        rewards = torch.from_numpy(np.vstack([d[2] for d in b_memory if d is not None])).float().to(device)
+        next_states = torch.from_numpy(np.vstack([d[3] for d in b_memory if d is not None])).float().to(device)
+        dones = torch.from_numpy(np.vstack([d[4] for d in b_memory if d is not None]).astype(np.uint8)).float().to(device)
+        return b_idx,(states,actions,rewards,next_states,dones), ISWeights
+    
+    def batch_update(self, tree_idx, abs_errors):
+        abs_errors+=self.epsilon #avoid zero
+        
+        clipped_errors=np.minimum(abs_errors,self.abs_err_upper)
+        ps=np.power(clipped_errors,self.alpha)
+        for ti,p in zip(tree_idx,ps):
+            self.tree.update(ti,p)
+            
+            
+    
+            
     
