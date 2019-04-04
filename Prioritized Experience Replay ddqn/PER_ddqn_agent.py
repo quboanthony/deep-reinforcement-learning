@@ -29,6 +29,7 @@ class Agent():
             action_size (int): dimension of each action
             seed (int): random seed
         """
+        self.replay_stroe_count=0
         self.state_size = state_size
         self.action_size = action_size
         self.seed = random.seed(seed)
@@ -40,7 +41,7 @@ class Agent():
 
         # Replay memory
         #self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed)
-        self.memory=self.PMemory(BUFFER_SIZE)
+        self.memory=PMemory(BUFFER_SIZE)
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
     
@@ -48,12 +49,12 @@ class Agent():
         # Save experience in replay memory
         transition=np.hstack((state,action,reward,next_state,done))
         self.memory.store(transition)
-        
+        self.replay_stroe_count+=1
         # Learn every UPDATE_EVERY time steps.
         self.t_step = (self.t_step + 1) % UPDATE_EVERY
         if self.t_step == 0:
             # If enough samples are available in memory, get random subset and learn
-            if len(self.memory) > BATCH_SIZE:
+            if self.replay_stroe_count > BUFFER_SIZE:
                 b_idx,experiences,ISWeights = self.memory.sample(BATCH_SIZE)
                 self.learn(b_idx,experiences, ISWeights, GAMMA)
 
