@@ -9,13 +9,14 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 BUFFER_SIZE = int(1e5)  # replay buffer size
-BATCH_SIZE = 64         # minibatch size
+BATCH_SIZE = 128         # minibatch size
 GAMMA = 0.99            # discount factor
 TAU = 1e-3              # for soft update of target parameters
 LR = 5e-4               # learning rate 
 UPDATE_EVERY = 4        # how often to update the network
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 class Agent():
     """Interacts with and learns from the environment."""
@@ -42,19 +43,26 @@ class Agent():
         # Replay memory
         #self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed)
         self.memory=PMemory(BUFFER_SIZE)
+        
+        self.experience = namedtuple("Experience",
+
+                                     field_names=["state", "action", "reward",
+
+                                                  "next_state", "done"])
+        
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
     
     def step(self, state, action, reward, next_state, done):
         # Save experience in replay memory
-        transition=np.hstack((state,action,reward,next_state,done))
+        transition=self.experience(state,action,reward,next_state,done)
         self.memory.store(transition)
         self.replay_stroe_count+=1
         # Learn every UPDATE_EVERY time steps.
         self.t_step = (self.t_step + 1) % UPDATE_EVERY
         if self.t_step == 0:
             # If enough samples are available in memory, get random subset and learn
-            if self.replay_stroe_count > BUFFER_SIZE:
+            if self.replay_stroe_count > BATCH_SIZE:
                 b_idx,experiences,ISWeights = self.memory.sample(BATCH_SIZE)
                 self.learn(b_idx,experiences, ISWeights, GAMMA)
 
@@ -218,7 +226,7 @@ class SumTree():
         self.update(tree_idx,p)
         #if the data has exceeded the capacity, score it from the beginning.
         self.data_insert_point+=1
-        if self.data_insert_point>self.capacity:
+        if self.data_insert_point>=self.capacity:
             self.data_insert_point=0
 
     def update(self,tree_idx,p):
@@ -239,6 +247,7 @@ class SumTree():
             child_node_r=child_node_l+1
             if child_node_l>=len(self.tree):
                 leaf_idx=parent_node
+                break
             else:
                 if v<=self.tree[child_node_l]:
                     parent_node=child_node_l
@@ -249,6 +258,7 @@ class SumTree():
         data_idx=leaf_idx-self.capacity+1
         return leaf_idx,self.tree[leaf_idx],self.data[data_idx]
     
+    @property
     def total_p(self):
         #get the total TD-error,which is located on the root of SumTree.
         return self.tree[0]
@@ -272,6 +282,7 @@ class PMemory():
     def __init__(self,capacity):
         self.tree=SumTree(capacity)
         
+        
     def store(self,transition):
         max_p=np.max(self.tree.tree[-self.tree.capacity:])
         if max_p==0:
@@ -279,8 +290,9 @@ class PMemory():
         self.tree.add(max_p,transition)
     
     def sample(self,n):
-        b_idx,b_memory, ISWeights=np.empty((n,),dtype=np.int32),np.empty((n,self.tree.data[0].size)),np.empty((n,1))
+        b_idx,b_memory, ISWeights=np.empty((n,),dtype=np.int32),deque(maxlen=n),np.empty((n,1))
         pri_seg=self.tree.total_p/n
+#        print(n,self.tree.total_p,pri_seg)
         self.beta=np.min([1.,self.beta+self.beta_increment_per_sampling])
         
         min_prob=np.min(self.tree.tree[-self.tree.capacity:])/self.tree.total_p
@@ -289,23 +301,27 @@ class PMemory():
             
         for i in range(n):
             a,b=pri_seg*i,pri_seg*(i+1)
+#            print(a,b)
             v=np.random.uniform(a,b)
             idx,p,data=self.tree.get_leaf(v)
             prob=p/self.tree.total_p
             ISWeights[i,0]=np.power(prob/min_prob,-self.beta)
             b_idx[i]=idx
-            b_memory[i,:]=data
+            b_memory.append(data)
             
-        states = torch.from_numpy(np.vstack([d[0] for d in b_memory if d is not None])).float().to(device)
-        actions = torch.from_numpy(np.vstack([d[1] for d in b_memory if d is not None])).long().to(device)
-        rewards = torch.from_numpy(np.vstack([d[2] for d in b_memory if d is not None])).float().to(device)
-        next_states = torch.from_numpy(np.vstack([d[3] for d in b_memory if d is not None])).float().to(device)
-        dones = torch.from_numpy(np.vstack([d[4] for d in b_memory if d is not None]).astype(np.uint8)).float().to(device)
+        states = torch.from_numpy(np.vstack([d.state for d in b_memory if d is not None])).float().to(device)
+        actions = torch.from_numpy(np.vstack([d.action for d in b_memory if d is not None])).long().to(device)
+        rewards = torch.from_numpy(np.vstack([d.reward for d in b_memory if d is not None])).float().to(device)
+        next_states = torch.from_numpy(np.vstack([d.next_state for d in b_memory if d is not None])).float().to(device)
+        dones = torch.from_numpy(np.vstack([d.done for d in b_memory if d is not None]).astype(np.uint8)).float().to(device)
         return b_idx,(states,actions,rewards,next_states,dones), ISWeights
     
-    def batch_update(self, tree_idx, abs_errors):
+    def batch_update(self, tree_idx, td_errors):
+        abs_errors=np.array([abs(float(f_tderr)) for f_tderr in td_errors])
+#        print(abs_errors)    
         abs_errors+=self.epsilon #avoid zero
         
+        #transition priority: pi^α = (|δi| + ε)^α
         clipped_errors=np.minimum(abs_errors,self.abs_err_upper)
         ps=np.power(clipped_errors,self.alpha)
         for ti,p in zip(tree_idx,ps):
